@@ -27,7 +27,7 @@ class Gaussian:
     def prob_z_zobs_integ(self, z, z_obs_lim, sigma_0):
 
         sigma = self._get_sigmazobs(z, sigma_0)
-        x_min = (z_obs_mean - z_obs_lim[0]) / (np.sqrt(2.0) * sigma)
-        x_max = (z_obs_mean - z_obs_lim[1]) / (np.sqrt(2.0) * sigma)
+        x_min = (z - z_obs_lim[0]) / (np.sqrt(2.0) * sigma)
+        x_max = (z - z_obs_lim[1]) / (np.sqrt(2.0) * sigma)
 
-        return gaussian_integral(xmin, xmax)
+        return gaussian_integral(x_min, x_max)

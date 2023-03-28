@@ -3,6 +3,10 @@ r"""Cluster Object
 import numpy as np
 import scipy.integrate
 
+import pyccl as ccl
+
+def raise_not_implement_error(*args, err_msg=''):
+    raise NotImplementedError(err_msg)
 
 class ClusterAbundance():
     r"""Cluster Abundance Object.
@@ -50,23 +54,23 @@ class ClusterAbundance():
                 if prob_logMobs_logM_integ is not None
                 else self._prob_logMobs_logM_integ)
         else:
-            self.prob_logMobs_logM = lambda *args: raise NotImplementedError(
-                "There is no P(logM_obs|logM) defined!")
+            self.prob_logMobs_logM = lambda *args: raise_not_implement_error(
+                err_msg="There is no P(logM_obs|logM) defined!")
             self.prob_logMobs_logM_integ = lambda *args: 1.0
 
         if self.has_redshift_proxy:
             self.prob_zobs_ztrue = prob_zobs_ztrue
-            self.prob_zobs_z_integ = (
-                prob_zobs_z_integ if prob_zobs_z_integ is not None
-                else self._prob_zobs_z_integ)
+            self.prob_zobs_ztrue_integ = (
+                prob_zobs_ztrue_integ if prob_zobs_ztrue_integ is not None
+                else self._prob_zobs_ztrue_integ)
         else:
-            self.prob_zobs_ztrue = lambda *args: raise NotImplementedError(
-                "There is no P(z_obs|z_true) defined!")
+            self.prob_zobs_ztrue = lambda *args: raise_not_implement_error(
+                err_msg="There is no P(z_obs|z_true) defined!")
             self.prob_zobs_ztrue_integ = lambda *args: 1.0
 
         # used for 0->infty integrals
         self.logM_true_lim=(13.0, 16.0)
-        self.z_true_lim=(0.0, 2.0),
+        self.z_true_lim=(0.0, 2.0)
 
 
     def compute_differential_comoving_volume(self, z):
@@ -85,20 +89,20 @@ class ClusterAbundance():
         """
         a = 1.0 / (1.0 + z)  # pylint: disable=invalid-name
         # pylint: disable-next=invalid-name
-        da = ccl.background.angular_diameter_distance(ccl_cosmo, a)
-        E = ccl.background.h_over_h0(ccl_cosmo, a)  # pylint: disable=invalid-name
+        da = ccl.background.angular_diameter_distance(self.cosmo, a)
+        E = ccl.background.h_over_h0(self.cosmo, a)  # pylint: disable=invalid-name
         dV = (  # pylint: disable=invalid-name
             ((1.0 + z) ** 2)
             * (da**2)
             * ccl.physical_constants.CLIGHT_HMPC
-            / ccl_cosmo["h"]
+            / self.cosmo["h"]
             / E
         )
         return dV
 
 
     def _prob_logMobs_logM_integ(
-        self, logM, logMobs_lim, logMobs_args=(),
+        self, logM, logMobs_lim, *logMobs_args,
         epsabs=1.0e-4, epsrel=1.0e-4,
     ):
         r"""Computes the integral of P(logM_obs|logM) over observed mass limits.
@@ -132,7 +136,7 @@ class ClusterAbundance():
         )[0]
 
     def _prob_zobs_z_integ(
-        self, z, zobs_lim, zobs_args=(),
+        self, z, zobs_lim, *zobs_args,
         epsabs=1.0e-4, epsrel=1.0e-4,
     ):
         r"""Computes the integral of P(z_obs|z) over observed redshift limits.
@@ -195,15 +199,13 @@ class ClusterAbundance():
         return (
             self.compute_differential_comoving_volume(z)
             *self.hmf(logM, z, *hmf_args)
-            *self.prob_logMobs_logM_integ(
-                logM, logMobs_lim, logMobs_args)
-            *self.prob_zobs_ztrue_integ(
-                z, zobs_lim, zobs_args)
+            *self.prob_logMobs_logM_integ(logM, logMobs_lim, *logMobs_args)
+            *self.prob_zobs_ztrue_integ(z, zobs_lim, *zobs_args)
         )
 
     def compute_abundance(
-        self, logMobs_lim, z,
-        logMobs_args=(), zobs_args=(),
+        self, logMobs_lim, zobs_lim,
+        hmf_args=(), logMobs_args=(), zobs_args=(),
         epsabs=1.0e-4, epsrel=1.0e-4,
         ):
         r"""Computes the integral of $d2n(logM, logM_obs, z, z_obs)$ over
@@ -293,6 +295,7 @@ class ClusterAbundance():
             *self.hmf(logM, z, *hmf_args)
             *self.prob_logMobs_logM(logM, logMobs, *logMobs_args)
             *self.prob_zobs_ztrue(z, zobs, *zobs_args)
+            )
 
     def d2ndlogmdz_dvdz_mobs_zobs(
         self, logMobs, zobs,

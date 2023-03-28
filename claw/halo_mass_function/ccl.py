@@ -3,15 +3,15 @@ from .parent import MassFunction
 
 class CCLMassFunction(MassFunction):
 
-    def __init__(self, hmd, hmf):
+    def __init__(self, hmd, hmf, cosmo):
 
         self.hmd = hmd
         self.hmf = hmf
         self.hmf_args = ()
-        self.hmf_call = self.hmf(ccl_cosmo, self.hmd)
+        self.cosmo = cosmo
 
     def __call__(
-        self, ccl_cosmo, logM, z, *hmf_args):
+        self, logM, z, *hmf_args):
         """
         parameters
 
@@ -26,28 +26,29 @@ class CCLMassFunction(MassFunction):
         nm : float
             Number Density  pdf at z and logm in units of Mpc^-3 (comoving).
         """
-        if self.hmf_args!=hmf_args:
-            self.hmf_call = self.hmf(ccl_cosmo, self.hmd, *hmf_args)
+        hmf_call = self.hmf(self.cosmo, self.hmd, *hmf_args)
 
-        return self.hmf_call.get_mass_function(
-            ccl_cosmo, 10**logM, 1.0/(1.0+z)) # pylint: disable=invalid-name
+        return hmf_call.get_mass_function(
+            self.cosmo, 10**logM, 1.0/(1.0+z)) # pylint: disable=invalid-name
 
 
-class TinkerMassFunction(CCLMassFunction):
+class Tinker08MassFunction(CCLMassFunction):
 
-    def __init__(self):
+    def __init__(self, cosmo):
 
         super().__init__(
             ccl.halos.MassDef200c(),
             ccl.halos.MassFuncTinker08,
+            cosmo,
             )
 
 
-class TinkerMassFunction(CCLMassFunction):
+class Bocquet18MassFunction(CCLMassFunction):
 
-    def __init__(self):
+    def __init__(self, cosmo):
 
         super().__init__(
             ccl.halos.MassDef200c(),
             ccl.halos.MassFuncBocquet16,
+            cosmo
             )
