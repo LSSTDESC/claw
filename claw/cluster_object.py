@@ -31,15 +31,38 @@ class ClusterAbundance():
 
         self.hmf = halo_mass_function
         self.cosmo = ccl_cosmology
-        self.prob_logMobs_logM = prob_logMobs_logM
-        self.prob_zobs_ztrue = prob_zobs_ztrue
 
-        self.prob_logMobs_logM_integ = (
-            prob_logMobs_logM_integ if prob_logMobs_logM_integ is not None
-            else self._prob_logMobs_logM_integ)
-        self.prob_zobs_z_integ = (
-            prob_zobs_z_integ if prob_zobs_z_integ is not None
-            else self._prob_zobs_z_integ)
+        self.has_mass_proxy = any(
+            prob is not None for prob in (
+                prob_logMobs_logM,
+                prob_logMobs_logM_integ)
+            )
+        self.has_redshift_proxy = any(
+            prob is not None for prob in (
+                prob_zobs_ztrue,
+                prob_zobs_ztrue_integ)
+            )
+
+        if self.has_mass_proxy:
+            self.prob_logMobs_logM = prob_logMobs_logM
+            self.prob_logMobs_logM_integ = (
+                prob_logMobs_logM_integ
+                if prob_logMobs_logM_integ is not None
+                else self._prob_logMobs_logM_integ)
+        else:
+            self.prob_logMobs_logM = lambda *args: raise NotImplementedError(
+                "There is no P(logM_obs|logM) defined!")
+            self.prob_logMobs_logM_integ = lambda *args: 1.0
+
+        if self.has_redshift_proxy:
+            self.prob_zobs_ztrue = prob_zobs_ztrue
+            self.prob_zobs_z_integ = (
+                prob_zobs_z_integ if prob_zobs_z_integ is not None
+                else self._prob_zobs_z_integ)
+        else:
+            self.prob_zobs_ztrue = lambda *args: raise NotImplementedError(
+                "There is no P(z_obs|z_true) defined!")
+            self.prob_zobs_ztrue_integ = lambda *args: 1.0
 
         # used for 0->infty integrals
         self.logM_true_lim=(13.0, 16.0)
@@ -83,8 +106,8 @@ class ClusterAbundance():
         .. math::
             \int_{logM_obs_min}^{logM_obs_max} dlogM_obs \;  P(logM_obs|logM, args).
 
-        parameters
-        __________
+        Parameters
+        ----------
         ccl_cosmo: Cosmology
             Pyccl cosmology
         logMobs: float
@@ -117,8 +140,8 @@ class ClusterAbundance():
         .. math::
             \int_{z_obs_min}^{z_obs_max} dz_obs \;  P(z_obs|z, args).
 
-        parameters
-        __________
+        Parameters
+        ----------
         ccl_cosmo: Cosmology
             Pyccl cosmology
         zobs: float
@@ -153,8 +176,8 @@ class ClusterAbundance():
             \int_{logM_obs_min}^{logM_obs_max} dlogM_obs \;  P(logM_obs|logM, args)
             \int_{z_obs_min}^{z_obs_max} dz \;  P(z_obs|z, args).
 
-        parameters
-        __________
+        Parameters
+        ----------
         ccl_cosmo: Cosmology
             Pyccl cosmology
         logMobs: float
@@ -192,8 +215,8 @@ class ClusterAbundance():
             \int_{logM_obs_min}^{logM_obs_max} dlogM_obs \;  P(logM_obs|logM, args)
             \int_{z_obs_min}^{z_obs_max} dz_obs \;  P(z_obs|z, args).
 
-        parameters
-        __________
+        Parameters
+        ----------
         ccl_cosmo: Cosmology
             Pyccl cosmology
         logMobs: float
@@ -207,16 +230,24 @@ class ClusterAbundance():
         d2n: float
             integrand of the counts integral.
         """
+        if self.has_mass_proxy:
+            logM_integ_lim = self.logM_true_lim
+        else:
+            logM_integ_lim = logMobs_lim
+        if self.has_redshift_proxy:
+            z_integ_lim = self.z_true_lim
+        else:
+            z_integ_lim = zobs_lim
         return scipy.integrate.dblquad(
             lambda logM, z: self.d2ndlogmdz_dvdz_fmobs_fzobs(
                 logM, z, logMobs_lim, zobs_lim, hmf_args=hmf_args,
                 logMobs_args=logMobs_args, zobs_args=zobs_args),
-            self.z_true_lim[0],
-            self.z_true_lim[1],
+            z_integ_lim[0],
+            z_integ_lim[1],
             # pylint: disable-next=cell-var-from-loop
-            lambda x: self.logM_true_lim[0],
+            lambda x: logM_integ_lim[0],
             # pylint: disable-next=cell-var-from-loop
-            lambda x: self.logM_true_lim[1],
+            lambda x: logM_integ_lim[1],
             epsabs=epsabs,
             epsrel=epsrel,
         )[0]
@@ -234,8 +265,8 @@ class ClusterAbundance():
         .. math::
             d2n(logM, logM_obs, z, z_obs) = \frac{d2n}{dlogMdz}  P(z_obs|logM, z)  P(logM_obs|logM, z) \frac{dv}{dz} dlogM dz.
 
-        parameters
-        __________
+        Parameters
+        ----------
         logM: float
             Cluster mass given by log10(M) where M is in units of M_sun (comoving).
         z : float
@@ -273,8 +304,8 @@ class ClusterAbundance():
         .. math::
             d2n(logM_obs, z_obs) = \int_{logM_min}^{logM_max}\int_{z_min}^{z_max}\frac{d2n}{dlogMdz}  P(z_obs|logM, z)  P(logM_obs|logM, z) \frac{dv}{dz} dlogM dz.
 
-        parameters
-        __________
+        Parameters
+        ----------
         ccl_cosmo: Cosmology
             Pyccl cosmology
         logMobs: float
