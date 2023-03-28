@@ -1,9 +1,7 @@
 """Cluster Mass Richness proxy
 """
-import pyccl as ccl
 import numpy as np
-from scipy import special
-from .cluster_mass import ClusterMass
+from ..utils import gaussian, gaussian_integral
 
 ln10 = np.log(10)
 
@@ -43,8 +41,8 @@ class PowerLawGaussian:
     ):
         logM_obs_mean, sigma = self._get_meanlogMobs_sigmalogMobs(
             logM, z, mu_p0, mu_p1, mu_p2, sigma_p0, sigma_p1, sigma_p2)
-        chisq = (logM_obs-logM_obs_mean)**2 / (2*sigma**2)
-        return np.exp(-chisq) / (np.sqrt(2.0 * np.pi) * sigma)
+
+        return gaussian(logM_obs, logM_obs_mean, sigma)
 
     def prob_logM_logMobs_integ(
         self, logM, logM_obs_lim,
@@ -54,7 +52,5 @@ class PowerLawGaussian:
             logM, z, mu_p0, mu_p1, mu_p2, sigma_p0, sigma_p1, sigma_p2)
         x_min = (logM_obs_mean - logM_obs_lim[0]) / (np.sqrt(2.0) * sigma)
         x_max = (logM_obs_mean - logM_obs_lim[1]) / (np.sqrt(2.0) * sigma)
-        if x_max > 4.0:
-            return (special.erfc(x_min) - special.erfc(x_max)) / 2.0
-        else:
-            return (special.erf(x_min) - special.erf(x_max)) / 2.0
+
+        return gaussian_integral(xmin, xmax)
